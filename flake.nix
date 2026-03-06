@@ -3,9 +3,13 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixekd-src = {
+      url = "path:/home/claw/nixekd";
+      flake = false;
+    };
   };
 
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, nixekd-src }:
   let
     system = "x86_64-linux";
     pkgs = import nixpkgs { inherit system; };
@@ -15,28 +19,26 @@
     packages.${system}.nixekcid = pkgs.rustPlatform.buildRustPackage {
       pname = "nixek-ci-agent";
       version = "0.1.0";
-      src = ../nixekd;
-      cargoLock.lockFile = ../nixekd/Cargo.lock;
+      src = nixekd-src;
+      cargoLock.lockFile = "${nixekd-src}/Cargo.lock";
     };
 
     packages.${system}.default = self.packages.${system}.nixekcid;
 
     # Library for defining CI jobs
     lib = {
-      # mkJob: create a CI job with a NixOS machine and steps
-      # Usage: mkJob { inherit nixpkgs pkgs nixekcid; } { machine = { ... }; steps = [ ... ]; }
+      # mkMachine: create machine images (qemu/aws) with nixek-ci-agent baked in
       mkMachine = { nixpkgs, pkgs, nixekcid, extraModules ? [] }: let
         lib = pkgs.lib;
         evalConfig = import "${nixpkgs}/nixos/lib/eval-config.nix";
 
         baseModule = { config, ... }: {
-          # nixek-ci agent baked in
           environment.systemPackages = [ nixekcid ];
 
-          # Mark this as a CI VM
+          # Mark this as a CI VM for auto-poweroff
           system.activationScripts.nixek-ci-marker = "mkdir -p /run && touch /run/nixek-ci-vm";
 
-          # Mount 9p config share if available
+          # Mount 9p config share if available (QEMU local testing)
           fileSystems."/mnt/nixek-config" = {
             device = "nixek-config";
             fsType = "9p";
@@ -54,18 +56,6 @@
               ExecStart = "${nixekcid}/bin/nixek-ci-agent run-job";
               StandardOutput = "journal+console";
               StandardError = "journal+console";
-            };
-          };
-
-          # Auto-poweroff after agent finishes (success or failure)
-          systemd.services.nixek-ci-poweroff = {
-            description = "Power off after CI job";
-            wantedBy = [ "multi-user.target" ];
-            after = [ "nixek-ci-agent.service" ];
-            requires = [ "nixek-ci-agent.service" ];
-            serviceConfig = {
-              Type = "oneshot";
-              ExecStart = "${pkgs.systemd}/bin/systemctl poweroff";
             };
           };
         };
@@ -97,17 +87,6 @@
             ] ++ extraModules;
           }).config;
         };
-
-        # Build an AWS AMI
-        aws = ((import "${nixpkgs}/nixos/release.nix") {
-          configuration = { config, ... }: {
-            amazonImage = {
-              format = "raw";
-              sizeMB = 8 * 1024;
-            };
-            imports = [ baseModule ] ++ extraModules;
-          };
-        }).amazonImage.x86_64-linux;
       };
     };
   };
