@@ -15,15 +15,17 @@
     pkgs = import nixpkgs { inherit system; };
   in
   {
-    # The nixek-ci-agent binary
-    packages.${system}.nixekcid = pkgs.rustPlatform.buildRustPackage {
-      pname = "nixek-ci-agent";
-      version = "0.1.0";
-      src = nixekd-src;
-      cargoLock.lockFile = "${nixekd-src}/Cargo.lock";
+    packages.${system} = let
+      nixekcid = pkgs.rustPlatform.buildRustPackage {
+        pname = "nixek-ci-agent";
+        version = "0.1.0";
+        src = nixekd-src;
+        cargoLock.lockFile = "${nixekd-src}/Cargo.lock";
+      };
+    in {
+      inherit nixekcid;
+      default = nixekcid;
     };
-
-    packages.${system}.default = self.packages.${system}.nixekcid;
 
     # Library for defining CI jobs
     lib = {
