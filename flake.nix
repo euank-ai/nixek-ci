@@ -62,6 +62,17 @@
           };
         };
       in {
+        # Build an AWS AMI (raw format for nixos-ami-upload / S3 import)
+        aws = ((import "${nixpkgs}/nixos/release.nix") {
+          configuration = { config, ... }: {
+            amazonImage = {
+              format = "raw";
+              sizeMB = 16 * 1024;
+            };
+            imports = [ baseModule ] ++ extraModules;
+          };
+        }).amazonImage.x86_64-linux;
+
         # Build a QEMU qcow2 image
         qemu = import "${nixpkgs}/nixos/lib/make-disk-image.nix" {
           inherit pkgs lib;
