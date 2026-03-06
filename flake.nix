@@ -35,7 +35,7 @@
         evalConfig = import "${nixpkgs}/nixos/lib/eval-config.nix";
 
         baseModule = { config, ... }: {
-          environment.systemPackages = [ nixekcid ];
+          environment.systemPackages = [ nixekcid pkgs.curl ];
 
           # Mark this as a CI VM for auto-poweroff
           system.activationScripts.nixek-ci-marker = "mkdir -p /run && touch /run/nixek-ci-vm";
@@ -55,9 +55,12 @@
             serviceConfig = {
               Type = "oneshot";
               RemainAfterExit = true;
+              ExecStartPre = "${pkgs.coreutils}/bin/sleep 5";
               ExecStart = "${nixekcid}/bin/nixek-ci-agent run-job";
               StandardOutput = "journal+console";
               StandardError = "journal+console";
+              Restart = "on-failure";
+              RestartSec = "5";
             };
           };
         };
