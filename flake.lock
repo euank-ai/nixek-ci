@@ -3,8 +3,8 @@
     "nixekd-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1772770678,
-        "narHash": "sha256-FZV0ohHSoh5jvBggmLN7SEXONm/EcG3hiawf9xJTY48=",
+        "lastModified": 1772777927,
+        "narHash": "sha256-GNH8RGrgnoQJQ2F03I5EMPoN4RjbMdRK0873JK0lr98=",
         "path": "/home/claw/nixekd",
         "type": "path"
       },

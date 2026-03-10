@@ -104,16 +104,32 @@ if [ "$MODE" = "ec2" ]; then
   
   echo "AMI: $AMI_ID"
   
+  # Create job in API and get auth token
+  JOB_ID=""
+  AUTH_TOKEN=""
+  if [ -n "$API_URL" ]; then
+    echo "--- Creating job in API ---"
+    CREATE_BODY=$(jq -n --arg name "$JOB_NAME" --argjson steps "$STEPS" \
+      '{name: $name, steps: ($steps | map({name: .name, command: .command}))}')
+    CREATE_RESP=$(curl -sf -X POST "${API_URL}/api/jobs" \
+      -H "Content-Type: application/json" \
+      -d "$CREATE_BODY")
+    JOB_ID=$(echo "$CREATE_RESP" | jq -r '.job_id')
+    AUTH_TOKEN=$(echo "$CREATE_RESP" | jq -r '.auth_token')
+    echo "Created job $JOB_ID with auth token"
+  else
+    JOB_ID="ec2-$(date +%s)"
+  fi
+
   # Create userdata with job config
-  USERDATA=$(cat <<EOF | base64 -w0
-{
-  "name": "${JOB_NAME}",
-  "job_id": "ec2-$(date +%s)",
-  "api_url": "${API_URL}",
-  "steps": ${STEPS}
-}
-EOF
-)
+  USERDATA=$(jq -n \
+    --arg name "$JOB_NAME" \
+    --arg job_id "$JOB_ID" \
+    --arg api_url "$API_URL" \
+    --arg auth_token "$AUTH_TOKEN" \
+    --argjson steps "$STEPS" \
+    '{name: $name, job_id: $job_id, api_url: $api_url, auth_token: $auth_token, steps: $steps}' \
+    | base64 -w0)
   
   # Launch instance
   INSTANCE_ID=$(aws ec2 run-instances \
